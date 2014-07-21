@@ -379,7 +379,7 @@ pkg_print (GFile *root, Header pkg,
 					      cancellable, error);
   gsize align = _console_get_width_stdout_cached ();
 
-  if (*from_repo)
+  if (from_repo)
     {
       if (align)
         {
