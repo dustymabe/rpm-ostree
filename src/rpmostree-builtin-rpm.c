@@ -314,37 +314,29 @@ pkg_yumdb_relpath (Header h1)
    return path;
 }
 
-static GInputStream *
-pkg_yumdb_file_read (GFile *root, Header pkg, const char *yumdb_key,
-		     GCancellable   *cancellable,
-		     GError        **error)
-{
-  gs_unref_object GFile *f = NULL;
-  gs_free char *pkgpath = pkg_yumdb_relpath (pkg);
-  gs_free char *path = g_strconcat ("/var/lib/yum/yumdb/", pkgpath, "/",
-				    yumdb_key, NULL);
-
-  f = g_file_resolve_relative_path (root, path);
-  return (GInputStream*)g_file_read (f, cancellable, error);
-}
-
-static char *
-pkg_yumdb_strdup (GFile *root, Header pkg, const char *yumdb_key,
+static gboolean
+yumdb_get_string (GFile          *root,
+                  Header          pkg,
+                  const char     *yumdb_key,
+                  char          **out_value,
 		  GCancellable   *cancellable,
 		  GError        **error)
 {
+  gboolean ret = FALSE;
   gs_unref_object GFile *f = NULL;
   gs_free char *pkgpath = pkg_yumdb_relpath (pkg);
   gs_free char *path = g_strconcat ("/var/lib/yum/yumdb/", pkgpath, "/",
 				    yumdb_key, NULL);
-  char *ret = NULL;
+  gs_free char *ret_value = NULL;
   
   f = g_file_resolve_relative_path (root, path);
 
-  if (!_rpmostree_file_load_contents_utf8_allow_noent (f, &ret,
-						       cancellable, error))
-    return g_strdup ("");
+  if (!_rpmostree_file_load_contents_utf8_allow_noent (f, &ret_value, cancellable, error))
+    goto out;
 
+  ret = TRUE;
+  gs_transfer_out_value (out_value, &ret_value);
+ out:
   return ret;
 }
 
@@ -375,9 +367,11 @@ pkg_print (GFile *root, Header pkg,
 	   GError        **error)
 {
   gs_free char *nevra = pkg_nevra_strdup (pkg);
-  gs_free char *from_repo = pkg_yumdb_strdup (root, pkg, "from_repo",
-					      cancellable, error);
+  gs_free char *from_repo = NULL;
   gsize align = _console_get_width_stdout_cached ();
+
+  if (!yumdb_get_string (root, pkg, "from_repo", &from_repo, cancellable, error))
+    return;
 
   if (from_repo)
     {
@@ -426,49 +420,40 @@ rpmhdrs_rpmdbv (GFile *root, struct RpmHeaders *l1,
   GChecksum *checksum = g_checksum_new (G_CHECKSUM_SHA1);
   gs_free char *checksum_cstr = NULL;
   int num = 0;
+  char *ret = NULL;
 
   while (num < l1->hs->len)
     {
       Header pkg = l1->hs->pdata[num++];
-      gs_unref_object GInputStream *tin = NULL;
-      gs_unref_object GInputStream *din = NULL;
-      char tbuf[1024];
-      char dbuf[1024];
+      gs_free char *csum_type = NULL;
+      gs_free char *csum_data = NULL;
       gs_free char *envra = pkg_envra_strdup (pkg);
-      gsize tbytes_read = 0;
-      gsize dbytes_read = 0;
       
       g_checksum_update (checksum, (guint8*)envra, strlen(envra));
       
-      tin = pkg_yumdb_file_read (root, pkg, "checksum_type", cancellable,error);
-      if (!tin)
-	continue;
+      if (!yumdb_get_string (root, pkg, "checksum_type", &csum_type,
+                             cancellable, error))
+        goto out;
+      if (!csum_type)
+        continue;
     
-      din = pkg_yumdb_file_read (root, pkg, "checksum_data", cancellable,error);
-      if (!din)
-	continue;
-
-      if (!g_input_stream_read_all (tin, tbuf, sizeof(tbuf), &tbytes_read,
-				    cancellable, error))
-	continue;
-      if (!g_input_stream_read_all (din, dbuf, sizeof(dbuf), &dbytes_read,
-				    cancellable, error))
-	continue;
+      if (!yumdb_get_string (root, pkg, "checksum_data", &csum_data,
+                             cancellable, error))
+        goto out;
+      if (!csum_data)
+        continue;
       
-      if (tbytes_read >= 512)
-	continue; // should be == len(md5) or len(sha256) etc.
-      if (dbytes_read >= 1024)
-	continue; // should be digest size of md5/sha256/sha512/etc.
-      
-      g_checksum_update (checksum, (guint8*)tbuf, tbytes_read);
-      g_checksum_update (checksum, (guint8*)dbuf, dbytes_read);
+      g_checksum_update (checksum, (guint8*)csum_type, strlen (csum_type));
+      g_checksum_update (checksum, (guint8*)csum_data, strlen (csum_data));
     }
   
   checksum_cstr = g_strdup (g_checksum_get_string (checksum));
   
   g_checksum_free (checksum);
   
-  return g_strdup_printf ("%u:%s", num, checksum_cstr);
+  ret = g_strdup_printf ("%u:%s", num, checksum_cstr);
+ out:
+  return ret;
 }
 
 static void
@@ -795,6 +780,8 @@ _builtin_rpm_version (OstreeRepo *repo, GFile *rpmdbdir, GPtrArray *revs,
 
 	rpmdbv = rpmhdrs_rpmdbv (rpmrev->root, rpmrev->rpmdb,
 				 cancellable, error);
+        if (!rpmdbv)
+          goto out;
 
 	// FIXME: g_console?
         _prnt_commit_line (rev, rpmrev);
