@@ -202,9 +202,6 @@ pat_fnmatch_match (Header pkg, const char *name,
 		   gsize patprefixlen, const GPtrArray *patterns)
 {
   int num = 0;
-  gs_free char *pkg_na    = NULL;
-  gs_free char *pkg_nevra = NULL;
-  gs_free char *pkg_nvr   = NULL;
 
   if (!patterns)
     return TRUE;
@@ -212,7 +209,10 @@ pat_fnmatch_match (Header pkg, const char *name,
   for (num = 0; num < patterns->len; num++)
     {
       const char *pattern = patterns->pdata[num];
-
+      gs_free char *pkg_na    = NULL;
+      gs_free char *pkg_nevra = NULL;
+      gs_free char *pkg_nvr   = NULL;
+      
       if (patprefixlen && !CASENCMP_EQ (name, pattern, patprefixlen))
 	continue;
 
