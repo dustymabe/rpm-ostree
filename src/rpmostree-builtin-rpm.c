@@ -237,59 +237,59 @@ pat_fnmatch_match (Header pkg, const char *name,
 static struct RpmHeaders *
 rpmhdrs_new (const char *root, const GPtrArray *patterns)
 {
- rpmts ts = rpmtsCreate();
- int status = -1;
- rpmdbMatchIterator iter;
- Header h1;
- GPtrArray *hs = NULL;
- struct RpmHeaders *ret = NULL;
- gsize patprefixlen = pat_fnmatch_prefix (patterns);
+  rpmts ts = rpmtsCreate();
+  int status = -1;
+  rpmdbMatchIterator iter;
+  Header h1;
+  GPtrArray *hs = NULL;
+  struct RpmHeaders *ret = NULL;
+  gsize patprefixlen = pat_fnmatch_prefix (patterns);
 
- // rpm also aborts on mem errors, so this is fine.
- g_assert (ts);
- rpmtsSetVSFlags (ts, _RPMVSF_NODIGESTS | _RPMVSF_NOSIGNATURES);
+  // rpm also aborts on mem errors, so this is fine.
+  g_assert (ts);
+  rpmtsSetVSFlags (ts, _RPMVSF_NODIGESTS | _RPMVSF_NOSIGNATURES);
 
- // This only fails if root isn't absolute.
- g_assert (root && root[0] == '/');
- status = rpmtsSetRootDir (ts, root);
- g_assert (status == 0);
+  // This only fails if root isn't absolute.
+  g_assert (root && root[0] == '/');
+  status = rpmtsSetRootDir (ts, root);
+  g_assert (status == 0);
 
- /* iter = rpmtsInitIterator (ts, RPMTAG_NAME, "yum", 0); */
- iter = rpmtsInitIterator (ts, RPMDBI_PACKAGES, NULL, 0);
+  /* iter = rpmtsInitIterator (ts, RPMTAG_NAME, "yum", 0); */
+  iter = rpmtsInitIterator (ts, RPMDBI_PACKAGES, NULL, 0);
 
- hs = g_ptr_array_new_with_free_func (header_free_p);
- while ((h1 = rpmdbNextIterator (iter)))
- {
-   const char*    name = headerGetString (h1, RPMTAG_NAME);
+  hs = g_ptr_array_new_with_free_func (header_free_p);
+  while ((h1 = rpmdbNextIterator (iter)))
+    {
+      const char*    name = headerGetString (h1, RPMTAG_NAME);
    
-   if (g_str_equal (name, "gpg-pubkey")) continue; /* rpmdb abstraction leak */
+      if (g_str_equal (name, "gpg-pubkey")) continue; /* rpmdb abstraction leak */
 
-   if (!pat_fnmatch_match (h1, name, patprefixlen, patterns))
-     continue;
+      if (!pat_fnmatch_match (h1, name, patprefixlen, patterns))
+        continue;
 
-   h1 = headerLink (h1);
-   g_ptr_array_add (hs, h1);
- }
- iter = rpmdbFreeIterator (iter);
+      h1 = headerLink (h1);
+      g_ptr_array_add (hs, h1);
+    }
+  iter = rpmdbFreeIterator (iter);
 
- g_ptr_array_sort (hs, header_cmp_p);
+  g_ptr_array_sort (hs, header_cmp_p);
 
- ret = g_malloc0 (sizeof (struct RpmHeaders));
+  ret = g_malloc0 (sizeof (struct RpmHeaders));
 
- ret->ts = ts;
- ret->hs = hs;
+  ret->ts = ts;
+  ret->hs = hs;
 
- return ret;
+  return ret;
 }
 
 static void
 rpmhdrs_free (struct RpmHeaders *l1)
 {
- g_ptr_array_free (l1->hs, TRUE);
- l1->hs = NULL;
- l1->ts = rpmtsFree (l1->ts);
+  g_ptr_array_free (l1->hs, TRUE);
+  l1->hs = NULL;
+  l1->ts = rpmtsFree (l1->ts);
 
- g_free (l1);
+  g_free (l1);
 }
 
 static char *
@@ -408,14 +408,14 @@ rpmhdrs_list (GFile *root, struct RpmHeaders *l1,
 	      GCancellable   *cancellable,
 	      GError        **error)
 {
- int num = 0;
+  int num = 0;
 
- while (num < l1->hs->len)
- {
-   Header h1 = l1->hs->pdata[num++];
-   printf (" ");
-   pkg_print (root, h1, cancellable, error);
- }
+  while (num < l1->hs->len)
+    {
+      Header h1 = l1->hs->pdata[num++];
+      printf (" ");
+      pkg_print (root, h1, cancellable, error);
+    }
 }
 
 static char *
@@ -728,7 +728,7 @@ ost_get_commit_hashes(OstreeRepo *repo, const char *beg, const char *end,
 }
 
 static GPtrArray *
-cmdline2ptrarray(int argc, char *argv[])
+cmdline2ptrarray (int argc, char *argv[])
 {
   GPtrArray *ret = NULL;
 
@@ -753,9 +753,9 @@ _prnt_commit_line(const char *rev, struct RpmRevisionData *rpmrev)
 }
 
 static gboolean
-_builtin_rpm_version(OstreeRepo *repo, GFile *rpmdbdir, GPtrArray *revs,
-                     GCancellable   *cancellable,
-                     GError        **error)
+_builtin_rpm_version (OstreeRepo *repo, GFile *rpmdbdir, GPtrArray *revs,
+                      GCancellable   *cancellable,
+                      GError        **error)
 {
   int num = 0;
   gboolean ret = FALSE;
@@ -808,10 +808,10 @@ _builtin_rpm_version(OstreeRepo *repo, GFile *rpmdbdir, GPtrArray *revs,
 }
 
 static gboolean
-_builtin_rpm_list(OstreeRepo *repo, GFile *rpmdbdir,
-                  GPtrArray *revs, const GPtrArray *patterns,
-                  GCancellable   *cancellable,
-                  GError        **error)
+_builtin_rpm_list (OstreeRepo *repo, GFile *rpmdbdir,
+                   GPtrArray *revs, const GPtrArray *patterns,
+                   GCancellable   *cancellable,
+                   GError        **error)
 {
   int num = 0;
   gboolean ret = FALSE;
